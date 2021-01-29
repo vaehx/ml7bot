@@ -1,0 +1,27 @@
+version: '2.2'
+services:
+  ml7bot:
+    image: openjdk:8-jdk-buster
+    container_name: ml7bot
+    command: java -jar /ml7bot.jar /config.properties
+    restart: unless-stopped
+    volumes:
+      - ../build/libs/ml7bot-1.0-all.jar:/ml7bot.jar:ro
+      - ../config.properties:/config.properties:ro
+
+  prometheus:
+    image: prom/prometheus
+    container_name: ml7bot-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=120d'
+    volumes:
+      - ../docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+
+volumes:
+  prometheus-data:

@@ -1,0 +1,46 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '6.1.0'
+    id 'java'
+}
+
+group = 'de.prkz.twitch.ml7bot'
+version = '1.0'
+description = 'ml7 Discord and Twitch Bot'
+
+sourceCompatibility = '1.8'
+
+def mainClassName = 'de.prkz.twitch.ml7bot.ML7Bot'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.discord4j:discord4j-core:3.1.3'
+    implementation 'com.github.pircbotx:pircbotx:2.2'
+    implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.13.3'
+    implementation 'org.json:json:20201115'
+
+    // Metrics
+    implementation group: 'io.micrometer', name: 'micrometer-core', version: '1.6.1'
+    implementation group: 'io.micrometer', name: 'micrometer-registry-prometheus', version: '1.6.1'
+}
+
+test {
+    useJUnitPlatform()
+    maxParallelForks = 1
+    outputs.upToDateWhen { false }
+}
+
+shadowJar {
+    mergeServiceFiles()
+
+    archiveBaseName = 'ml7bot'
+
+    manifest {
+        attributes 'Main-Class': "$mainClassName"
+    }
+}
+
+tasks.build.dependsOn tasks.shadowJar
