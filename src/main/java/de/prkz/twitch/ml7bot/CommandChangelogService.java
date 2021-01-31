@@ -114,6 +114,7 @@ public class CommandChangelogService {
                 .addListener(listener)
                 .setShutdownHookEnabled(false)
                 .setSocketTimeout(60 * 1000) // PING every 1min
+                .setOnJoinWhoEnabled(false) // twitch doesn't support WHO
                 .buildConfiguration();
 
         PircBotX bot = new PircBotX(botConfig);
