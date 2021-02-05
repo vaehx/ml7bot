@@ -26,18 +26,25 @@ class AssignPugsRole(commands.Cog):
 
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
-    @checks.thread_only()
-    async def givepugsrole(self, ctx):
+    async def givepugsrole(self, ctx, user: discord.User = None):
+        if user is None:
+            thread = ctx.thread
+            if not thread or thread.recipient is None:
+                await ctx.send("Not in a valid thread. Give the optional user argument to use this command outside of a thread.")
+                return
+            else:
+                user = thread.recipient
+
         pugs_role = await self._getPugsRole()
         if not pugs_role:
             await ctx.send(f"Error: 'PUGS' role does not exist")
             return
 
-        thread = ctx.thread
-        if thread.recipient == None:
+        pugger = self.pugs_guild.get_member(user.id)
+        if pugger is None:
+            await ctx.send("User not found")
             return
 
-        pugger = self.pugs_guild.get_member(thread.recipient.id)
         if pugs_role in pugger.roles:
             await ctx.send(f"User already has the PUGS role")
             return
@@ -47,18 +54,25 @@ class AssignPugsRole(commands.Cog):
 
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
-    @checks.thread_only()
-    async def removepugsrole(self, ctx):
+    async def removepugsrole(self, ctx, user: discord.User = None):
+        if user is None:
+            thread = ctx.thread
+            if not thread or thread.recipient is None:
+                await ctx.send("Not in a valid thread. Give the optional user argument to use this command outside of a thread.")
+                return
+            else:
+                user = thread.recipient
+
         pugs_role = await self._getPugsRole()
         if not pugs_role:
             await ctx.send(f"Error: 'PUGS' role does not exist")
             return
 
-        thread = ctx.thread
-        if thread.recipient == None:
+        pugger = self.pugs_guild.get_member(user.id)
+        if pugger is None:
+            await ctx.send("User not found")
             return
 
-        pugger = self.pugs_guild.get_member(thread.recipient.id)
         if not pugs_role in pugger.roles:
             await ctx.send(f"User does not have the PUGS role")
             return
