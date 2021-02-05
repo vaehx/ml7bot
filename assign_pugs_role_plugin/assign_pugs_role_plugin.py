@@ -26,11 +26,11 @@ class AssignPugsRole(commands.Cog):
 
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
-    @checks.thread_only()
     async def givepugsrole(self, ctx, user: discord.User = None):
         if user is None:
             thread = ctx.thread
-            if thread.recipient is None:
+            if not thread or thread.recipient is None:
+                await ctx.send("Not in a valid thread. Give the optional user argument to use this command outside of a thread.")
                 return
             else:
                 user = thread.recipient
@@ -54,11 +54,11 @@ class AssignPugsRole(commands.Cog):
 
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
-    @checks.thread_only()
     async def removepugsrole(self, ctx, user: discord.User = None):
         if user is None:
             thread = ctx.thread
-            if thread.recipient is None:
+            if not thread or thread.recipient is None:
+                await ctx.send("Not in a valid thread. Give the optional user argument to use this command outside of a thread.")
                 return
             else:
                 user = thread.recipient
