@@ -20,9 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -31,6 +29,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class CommandChangelogService {
+
+    /**
+     * In case we detect more changes than this, we will not announce changes, cause it's likely a bug and would
+     * only spam the discord channel.
+     */
+    private static final int MAX_CHANGES_TO_ANNOUNCE = 5;
 
     private static final Logger LOG = LoggerFactory.getLogger(CommandChangelogService.class);
 
@@ -170,17 +174,18 @@ public class CommandChangelogService {
 
             LOG.info("Fetched {} commands from Nightbot API", fetchedCommands.size());
 
+            // Determine command changes
+            List<NightbotCommandChange> changes = new ArrayList<>();
+
             for (String k : fetchedCommands.keySet()) {
-                if (!commands.containsKey(k)) {
-                    // New command
-                    onNewCommand(fetchedCommands.get(k));
-                }
+                if (!commands.containsKey(k))
+                    changes.add(new NightbotCommandChange(null, fetchedCommands.get(k)));
             }
 
             for (String k : commands.keySet()) {
                 if (!fetchedCommands.containsKey(k)) {
                     // Deleted command
-                    onDeletedCommand(commands.get(k));
+                    changes.add(new NightbotCommandChange(commands.get(k), null));
                 } else {
                     final NightbotCommand oldCmd = commands.get(k);
                     final NightbotCommand newCmd = fetchedCommands.get(k);
@@ -198,8 +203,24 @@ public class CommandChangelogService {
                     }
 
                     // Changed command
-                    onChangedCommand(oldCmd, newCmd);
+                    changes.add(new NightbotCommandChange(oldCmd, newCmd));
                 }
+            }
+
+            // Announce changes
+            if (changes.size() <= MAX_CHANGES_TO_ANNOUNCE) {
+                for (NightbotCommandChange change : changes) {
+                    if (change.isNew())
+                        onNewCommand(change.newCommand);
+                    else if (change.isDeleted())
+                        onDeletedCommand(change.oldCommand);
+                    else if (change.isEdited())
+                        onEditedCommand(change.oldCommand, change.newCommand);
+                }
+            } else {
+                LOG.warn("Found {} changed (new, deleted or edited) commands, which is more than the announcement " +
+                        "limit of {} changes. This is likely an error. Skipping discord announcements to prevent spam.",
+                        changes.size(), MAX_CHANGES_TO_ANNOUNCE);
             }
 
             commands = fetchedCommands;
@@ -229,7 +250,7 @@ public class CommandChangelogService {
                     ":\n" + getCommandInfo(cmd)).block();
         }
 
-        private void onChangedCommand(NightbotCommand oldCmd, NightbotCommand newCmd) {
+        private void onEditedCommand(NightbotCommand oldCmd, NightbotCommand newCmd) {
             if (ignoredCommands.contains(newCmd.name))
                 return;
 
@@ -251,6 +272,29 @@ public class CommandChangelogService {
          */
         private String getLikelyEditor(NightbotCommand cmd) {
             return lastTwitchCommandEditors.get(cmd.name);
+        }
+
+
+        private class NightbotCommandChange {
+            NightbotCommand oldCommand;
+            NightbotCommand newCommand;
+
+            public NightbotCommandChange(NightbotCommand oldCommand, NightbotCommand newCommand) {
+                this.oldCommand = oldCommand;
+                this.newCommand = newCommand;
+            }
+
+            boolean isNew() {
+                return oldCommand == null && newCommand != null;
+            }
+
+            boolean isDeleted() {
+                return oldCommand != null && newCommand == null;
+            }
+
+            boolean isEdited() {
+                return oldCommand != null && newCommand != null;
+            }
         }
     }
 
