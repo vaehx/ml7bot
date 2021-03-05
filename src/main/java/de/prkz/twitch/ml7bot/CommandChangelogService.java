@@ -257,7 +257,8 @@ public class CommandChangelogService {
             String editor = getLikelyEditor(newCmd);
             changelogChannel.createMessage("\u270F **Edited** command `" + newCmd.name + "`" +
                     (editor != null ? " by **" + editor + "** in Twitch Chat" : " in Dashboard") +
-                    " to:\n" + getCommandInfo(newCmd)).block();
+                    " to:\n" + getCommandInfo(newCmd) + "\n" +
+                    " Was:\n" + getCommandInfo(oldCmd)).block();
         }
 
         private String getCommandInfo(NightbotCommand cmd) {
