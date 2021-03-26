@@ -163,6 +163,11 @@ public class CommandChangelogService {
 
         @Override
         public void run() {
+            runIntrnl();
+            scheduleNextCommandsUpdate(config.getCommandChangelogUpdateIntervalMillis());
+        }
+
+        private void runIntrnl() {
             Map<String, NightbotCommand> fetchedCommands;
             try {
                 fetchedCommands = NightbotAPI.fetchChannelCommands(nightbotChannelId);
@@ -219,15 +224,13 @@ public class CommandChangelogService {
                 }
             } else {
                 LOG.warn("Found {} changed (new, deleted or edited) commands, which is more than the announcement " +
-                        "limit of {} changes. This is likely an error. Skipping discord announcements to prevent spam.",
+                                "limit of {} changes. This is likely an error. Skipping discord announcements to prevent spam.",
                         changes.size(), MAX_CHANGES_TO_ANNOUNCE);
             }
 
             commands = fetchedCommands;
 
             lastTwitchCommandEditors.clear();
-
-            scheduleNextCommandsUpdate(config.getCommandChangelogUpdateIntervalMillis());
         }
 
         private void onNewCommand(NightbotCommand cmd) {
