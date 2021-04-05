@@ -307,12 +307,12 @@ public class CommandChangelogService {
 
         @Override
         public void onMessage(MessageEvent event) throws Exception {
-
+            processedMessages.increment();
 
             if (event.getUser() == null)
                 return;
 
-            processedMessages.increment();
+            final String username = event.getUser().getNick();
 
             Matcher matcher = Pattern
                     .compile("^!(add|edit|del)com\\s+([^\\s]+)", Pattern.CASE_INSENSITIVE)
@@ -320,13 +320,17 @@ public class CommandChangelogService {
             if (!matcher.find())
                 return;
 
-            String command = matcher.group(2);
-            if (ignoredCommands.contains(command))
+            LOG.info("Found a command change in twitch chat: {} (User: {})", event.getMessage(), username);
+
+            final String command = matcher.group(2);
+            if (ignoredCommands.contains(command)) {
+                LOG.info("Command {} was configured to be ignored. Skipping announcement...", command);
                 return;
+            }
 
             // Save username as editor. Remember that it is unlikely that another user changes the same command in
             // the dashboard until the next scheduled command update completes
-            lastTwitchCommandEditors.put(command, event.getUser().getNick());
+            lastTwitchCommandEditors.put(command, username);
 
             // Here, we don't want to wait for the next periodic sync. But we also don't want to fetch nightbot
             // immediately, since we don't know how long the nightbot api takes to update / is cached. So instead
