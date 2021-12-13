@@ -3,7 +3,7 @@ services:
   ml7bot:
     image: openjdk:8-jdk-buster
     container_name: ml7bot
-    command: java -jar /ml7bot.jar /config.properties
+    command: java -Dlog4j2.formatMsgNoLookups=true -jar /ml7bot.jar /config.properties
     restart: unless-stopped
     volumes:
       - ../build/libs/ml7bot-1.0-all.jar:/ml7bot.jar:ro
