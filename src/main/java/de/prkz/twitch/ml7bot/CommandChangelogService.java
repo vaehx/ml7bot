@@ -1,5 +1,6 @@
 package de.prkz.twitch.ml7bot;
 
+import com.google.common.annotations.VisibleForTesting;
 import de.prkz.twitch.ml7bot.config.Config;
 import de.prkz.twitch.ml7bot.metrics.MetricsService;
 import de.prkz.twitch.ml7bot.nightbot.NightbotAPI;
@@ -13,6 +14,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.pircbotx.Configuration;
 import org.pircbotx.MultiBotManager;
 import org.pircbotx.PircBotX;
+import org.pircbotx.User;
 import org.pircbotx.delay.StaticDelay;
 import org.pircbotx.hooks.ListenerAdapter;
 import org.pircbotx.hooks.events.*;
@@ -34,7 +36,24 @@ public class CommandChangelogService {
      * In case we detect more changes than this, we will not announce changes, cause it's likely a bug and would
      * only spam the discord channel.
      */
-    private static final int MAX_CHANGES_TO_ANNOUNCE = 5;
+    public static final int MAX_CHANGES_TO_ANNOUNCE = 5;
+
+    /**
+     * Patterns to use to find moderator messages that modify (add/edit/delete) chat commands
+     */
+    public static final List<Pattern> COMMAND_MODIFICATION_PATTERNS = Arrays.asList(
+            // Legacy commands
+            Pattern.compile("^!(add|edit|del)com\\s+(?<command>[^\\s]+)", Pattern.CASE_INSENSITIVE),
+
+            // https://docs.nightbot.tv/commands/commands
+            Pattern.compile("^!commands\\s+(add|edit|delete)\\s+(?<command>[^\\s]+)", Pattern.CASE_INSENSITIVE)
+    );
+
+    /**
+     * Name of the regex capture group in the {@link CommandChangelogService#COMMAND_MODIFICATION_PATTERNS} patterns
+     * that contains the actual modified chat command
+     */
+    public static final String MODIFIED_COMMAND_GROUP_NAME = "command";
 
     private static final Logger LOG = LoggerFactory.getLogger(CommandChangelogService.class);
 
@@ -156,6 +175,28 @@ public class CommandChangelogService {
 
         scheduledSync = scheduler.schedule(commandsUpdater, delayMillis, TimeUnit.MILLISECONDS);
         LOG.info("Scheduled next command list update");
+    }
+
+
+    /**
+     * Checks if the given message is a command to modify a chat command and if so, returns the modified command.
+     * Otherwise returns <code>null</code>.
+     *
+     * <p>
+     *     For example, for a message of
+     *     <pre>!addcom !foo bar...</pre>
+     *     the string "!foo" is returned.
+     * </p>
+     */
+    @VisibleForTesting
+    static String getModifiedCommand(String message) {
+        for (Pattern pattern : COMMAND_MODIFICATION_PATTERNS) {
+            Matcher matcher = pattern.matcher(message);
+            if (matcher.find())
+                return matcher.group(MODIFIED_COMMAND_GROUP_NAME);
+        }
+
+        return null;
     }
 
 
@@ -309,28 +350,26 @@ public class CommandChangelogService {
         public void onMessage(MessageEvent event) throws Exception {
             processedMessages.increment();
 
-            if (event.getUser() == null)
+            final User user = event.getUser();
+            if (user == null)
                 return;
 
-            final String username = event.getUser().getNick();
+            final String username = user.getNick();
 
-            Matcher matcher = Pattern
-                    .compile("^!(add|edit|del)com\\s+([^\\s]+)", Pattern.CASE_INSENSITIVE)
-                    .matcher(event.getMessage());
-            if (!matcher.find())
+            final String modifiedCommand = getModifiedCommand(event.getMessage());
+            if (modifiedCommand == null)
                 return;
 
             LOG.info("Found a command change in twitch chat: {} (User: {})", event.getMessage(), username);
 
-            final String command = matcher.group(2);
-            if (ignoredCommands.contains(command)) {
-                LOG.info("Command {} was configured to be ignored. Skipping announcement...", command);
+            if (ignoredCommands.contains(modifiedCommand)) {
+                LOG.info("Command {} was configured to be ignored. Skipping announcement...", modifiedCommand);
                 return;
             }
 
             // Save username as editor. Remember that it is unlikely that another user changes the same command in
             // the dashboard until the next scheduled command update completes
-            lastTwitchCommandEditors.put(command, username);
+            lastTwitchCommandEditors.put(modifiedCommand, username);
 
             // Here, we don't want to wait for the next periodic sync. But we also don't want to fetch nightbot
             // immediately, since we don't know how long the nightbot api takes to update / is cached. So instead

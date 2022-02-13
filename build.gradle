@@ -25,6 +25,9 @@ dependencies {
     // Metrics
     implementation group: 'io.micrometer', name: 'micrometer-core', version: '1.6.1'
     implementation group: 'io.micrometer', name: 'micrometer-registry-prometheus', version: '1.6.1'
+
+    testImplementation(platform('org.junit:junit-bom:5.8.2'))
+    testImplementation('org.junit.jupiter:junit-jupiter')
 }
 
 test {
