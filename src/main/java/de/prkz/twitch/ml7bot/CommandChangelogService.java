@@ -27,6 +27,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -67,6 +69,7 @@ public class CommandChangelogService {
     private Map<String, NightbotCommand> commands;
     private Set<String> ignoredCommands;
     private CommandsUpdater commandsUpdater;
+    private Lock commandUpdateLock;
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> scheduledSync;
 
@@ -105,6 +108,7 @@ public class CommandChangelogService {
 
         scheduler = Executors.newScheduledThreadPool(1);
         commandsUpdater = new CommandsUpdater();
+        commandUpdateLock = new ReentrantLock();
 
         LOG.info("Fetching nightbot commands to diff against...");
         try {
@@ -204,8 +208,13 @@ public class CommandChangelogService {
 
         @Override
         public void run() {
-            runIntrnl();
-            scheduleNextCommandsUpdate(config.getCommandChangelogUpdateIntervalMillis());
+            try {
+                commandUpdateLock.lock();
+                runIntrnl();
+                scheduleNextCommandsUpdate(config.getCommandChangelogUpdateIntervalMillis());
+            } finally {
+                commandUpdateLock.unlock();
+            }
         }
 
         private void runIntrnl() {
@@ -367,14 +376,20 @@ public class CommandChangelogService {
                 return;
             }
 
-            // Save username as editor. Remember that it is unlikely that another user changes the same command in
-            // the dashboard until the next scheduled command update completes
-            lastTwitchCommandEditors.put(modifiedCommand, username);
+            try {
+                commandUpdateLock.lock();
 
-            // Here, we don't want to wait for the next periodic sync. But we also don't want to fetch nightbot
-            // immediately, since we don't know how long the nightbot api takes to update / is cached. So instead
-            // we force the next sync in a few seconds from now.
-            scheduleNextCommandsUpdate(Duration.ofSeconds(5).toMillis());
+                // Save username as editor. Remember that it is unlikely that another user changes the same command in
+                // the dashboard until the next scheduled command update completes
+                lastTwitchCommandEditors.put(modifiedCommand, username);
+
+                // Here, we don't want to wait for the next periodic sync. But we also don't want to fetch nightbot
+                // immediately, since we don't know how long the nightbot api takes to update / is cached. So instead
+                // we force the next sync in a few seconds from now.
+                scheduleNextCommandsUpdate(Duration.ofSeconds(5).toMillis());
+            } finally {
+                commandUpdateLock.unlock();
+            }
         }
 
         @Override
