@@ -1,4 +1,4 @@
-package de.prkz.twitch.ml7bot.config;
+package net.aehx.twitch.ml7bot.config;
 
 import java.io.FileInputStream;
 import java.io.IOException;

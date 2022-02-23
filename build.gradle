@@ -3,13 +3,13 @@ plugins {
     id 'java'
 }
 
-group = 'de.prkz.twitch.ml7bot'
+group = 'net.aehx.twitch.ml7bot'
 version = '1.0'
 description = 'ml7 Discord and Twitch Bot'
 
 sourceCompatibility = '1.8'
 
-def mainClassName = 'de.prkz.twitch.ml7bot.ML7Bot'
+def mainClassName = 'net.aehx.twitch.ml7bot.ML7Bot'
 
 repositories {
     mavenCentral()

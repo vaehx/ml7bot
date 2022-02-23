@@ -1,4 +1,4 @@
-package de.prkz.twitch.ml7bot.nightbot;
+package net.aehx.twitch.ml7bot.nightbot;
 
 public class NightbotCommand {
     public String id;

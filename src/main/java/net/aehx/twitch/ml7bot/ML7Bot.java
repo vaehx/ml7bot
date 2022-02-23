@@ -1,7 +1,7 @@
-package de.prkz.twitch.ml7bot;
+package net.aehx.twitch.ml7bot;
 
-import de.prkz.twitch.ml7bot.config.Config;
-import de.prkz.twitch.ml7bot.metrics.MetricsService;
+import net.aehx.twitch.ml7bot.config.Config;
+import net.aehx.twitch.ml7bot.metrics.MetricsService;
 import discord4j.core.DiscordClient;
 import discord4j.core.GatewayDiscordClient;
 import org.slf4j.Logger;

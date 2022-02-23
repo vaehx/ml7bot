@@ -1,6 +1,6 @@
-package de.prkz.twitch.ml7bot;
+package net.aehx.twitch.ml7bot;
 
-import de.prkz.twitch.ml7bot.config.Config;
+import net.aehx.twitch.ml7bot.config.Config;
 import discord4j.common.util.Snowflake;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.message.MessageCreateEvent;

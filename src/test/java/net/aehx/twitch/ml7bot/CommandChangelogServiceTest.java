@@ -1,8 +1,8 @@
-package de.prkz.twitch.ml7bot;
+package net.aehx.twitch.ml7bot;
 
 import org.junit.jupiter.api.Test;
 
-import static de.prkz.twitch.ml7bot.CommandChangelogService.getModifiedCommand;
+import static net.aehx.twitch.ml7bot.CommandChangelogService.getModifiedCommand;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 

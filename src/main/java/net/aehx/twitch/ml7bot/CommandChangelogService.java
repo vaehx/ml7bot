@@ -1,4 +1,4 @@
-package de.prkz.twitch.ml7bot;
+package net.aehx.twitch.ml7bot;
 
 import com.github.philippheuer.events4j.core.EventManager;
 import com.github.twitch4j.chat.TwitchChat;
@@ -7,11 +7,11 @@ import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
 import com.github.twitch4j.common.enums.CommandPermission;
 import com.github.twitch4j.common.events.domain.EventUser;
 import com.google.common.annotations.VisibleForTesting;
-import de.prkz.twitch.ml7bot.config.Config;
-import de.prkz.twitch.ml7bot.metrics.MetricsService;
-import de.prkz.twitch.ml7bot.nightbot.NightbotAPI;
-import de.prkz.twitch.ml7bot.nightbot.NightbotChannel;
-import de.prkz.twitch.ml7bot.nightbot.NightbotCommand;
+import net.aehx.twitch.ml7bot.config.Config;
+import net.aehx.twitch.ml7bot.metrics.MetricsService;
+import net.aehx.twitch.ml7bot.nightbot.NightbotAPI;
+import net.aehx.twitch.ml7bot.nightbot.NightbotChannel;
+import net.aehx.twitch.ml7bot.nightbot.NightbotCommand;
 import discord4j.common.util.Snowflake;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.object.entity.channel.GuildMessageChannel;

@@ -1,4 +1,4 @@
-package de.prkz.twitch.ml7bot.metrics;
+package net.aehx.twitch.ml7bot.metrics;
 
 import com.sun.net.httpserver.HttpServer;
 import io.micrometer.core.instrument.Meter;
