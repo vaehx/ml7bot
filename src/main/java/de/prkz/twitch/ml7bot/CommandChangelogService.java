@@ -1,5 +1,11 @@
 package de.prkz.twitch.ml7bot;
 
+import com.github.philippheuer.events4j.core.EventManager;
+import com.github.twitch4j.chat.TwitchChat;
+import com.github.twitch4j.chat.TwitchChatBuilder;
+import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
+import com.github.twitch4j.common.enums.CommandPermission;
+import com.github.twitch4j.common.events.domain.EventUser;
 import com.google.common.annotations.VisibleForTesting;
 import de.prkz.twitch.ml7bot.config.Config;
 import de.prkz.twitch.ml7bot.metrics.MetricsService;
@@ -11,13 +17,6 @@ import discord4j.core.GatewayDiscordClient;
 import discord4j.core.object.entity.channel.GuildMessageChannel;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.pircbotx.Configuration;
-import org.pircbotx.MultiBotManager;
-import org.pircbotx.PircBotX;
-import org.pircbotx.User;
-import org.pircbotx.delay.StaticDelay;
-import org.pircbotx.hooks.ListenerAdapter;
-import org.pircbotx.hooks.events.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +61,7 @@ public class CommandChangelogService {
     private final Config config;
     private final GatewayDiscordClient discord;
 
-    private MultiBotManager botManager;
+    private TwitchChat twitchChat;
     private GuildMessageChannel changelogChannel;
     private String nightbotChannelId;
     private Map<String, String> lastTwitchCommandEditors; // command name -> username
@@ -129,29 +128,13 @@ public class CommandChangelogService {
         LOG.info("Found command changelog channel #{}", changelogChannel.getName());
 
 
-        BotListener listener = new BotListener();
+        twitchChat = TwitchChatBuilder.builder()
+                .build();
 
-        Configuration botConfig = new Configuration.Builder()
-                .setName("justinfan82394")
-                .addServer("irc.chat.twitch.tv", 6667)
-                .addAutoJoinChannel("#" + config.getCommandChangelogTwitchChannel())
-                .setAutoReconnect(true)
-                .setAutoReconnectAttempts(20)
-                .setAutoReconnectDelay(new StaticDelay(10000))
-                .addListener(listener)
-                .setShutdownHookEnabled(false)
-                .setSocketTimeout(60 * 1000) // PING every 1min
-                .setOnJoinWhoEnabled(false) // twitch doesn't support WHO
-                .buildConfiguration();
+        twitchChat.joinChannel(config.getCommandChangelogTwitchChannel());
 
-        PircBotX bot = new PircBotX(botConfig);
-
-        botManager = new MultiBotManager();
-        botManager.addBot(bot);
-
-        botManager.start();
-
-        LOG.info("Bot manager started");
+        EventManager eventManager = twitchChat.getEventManager();
+        eventManager.onEvent(ChannelMessageEvent.class, this::onChatMessage);
 
 
         scheduleNextCommandsUpdate(config.getCommandChangelogUpdateIntervalMillis());
@@ -163,10 +146,51 @@ public class CommandChangelogService {
         LOG.info("Stopping twitch chat bot...");
 
         try {
-            botManager.getBots().forEach(PircBotX::stopBotReconnect);
-            botManager.stopAndWait();
+            twitchChat.disconnect();
+            twitchChat.close();
         } catch (Exception e) {
-            throw new RuntimeException("Failed waiting for twitch chat to exit", e);
+            throw new RuntimeException("Failed waiting for twitch chat client to exit", e);
+        }
+    }
+
+    private void onChatMessage(ChannelMessageEvent event) {
+        processedMessages.increment();
+
+        final EventUser user = event.getUser();
+        if (user == null)
+            return;
+
+        // Ignore attempts to modify a command by non-moderators
+        Set<CommandPermission> permissions = event.getPermissions();
+        if (!(permissions.contains(CommandPermission.MODERATOR) || permissions.contains(CommandPermission.BROADCASTER)))
+            return;
+
+        final String username = user.getName();
+
+        final String modifiedCommand = getModifiedCommand(event.getMessage());
+        if (modifiedCommand == null)
+            return;
+
+        LOG.info("Found a command change in twitch chat: {} (User: {})", event.getMessage(), username);
+
+        if (ignoredCommands.contains(modifiedCommand)) {
+            LOG.info("Command {} was configured to be ignored. Skipping announcement...", modifiedCommand);
+            return;
+        }
+
+        try {
+            commandUpdateLock.lock();
+
+            // Save username as editor. Remember that it is unlikely that another user changes the same command in
+            // the dashboard until the next scheduled command update completes
+            lastTwitchCommandEditors.put(modifiedCommand, username);
+
+            // Here, we don't want to wait for the next periodic sync. But we also don't want to fetch nightbot
+            // immediately, since we don't know how long the nightbot api takes to update / is cached. So instead
+            // we force the next sync in a few seconds from now.
+            scheduleNextCommandsUpdate(Duration.ofSeconds(5).toMillis());
+        } finally {
+            commandUpdateLock.unlock();
         }
     }
 
@@ -349,65 +373,6 @@ public class CommandChangelogService {
             boolean isEdited() {
                 return oldCommand != null && newCommand != null;
             }
-        }
-    }
-
-
-    private class BotListener extends ListenerAdapter {
-
-        @Override
-        public void onMessage(MessageEvent event) throws Exception {
-            processedMessages.increment();
-
-            final User user = event.getUser();
-            if (user == null)
-                return;
-
-            final String username = user.getNick();
-
-            final String modifiedCommand = getModifiedCommand(event.getMessage());
-            if (modifiedCommand == null)
-                return;
-
-            LOG.info("Found a command change in twitch chat: {} (User: {})", event.getMessage(), username);
-
-            if (ignoredCommands.contains(modifiedCommand)) {
-                LOG.info("Command {} was configured to be ignored. Skipping announcement...", modifiedCommand);
-                return;
-            }
-
-            try {
-                commandUpdateLock.lock();
-
-                // Save username as editor. Remember that it is unlikely that another user changes the same command in
-                // the dashboard until the next scheduled command update completes
-                lastTwitchCommandEditors.put(modifiedCommand, username);
-
-                // Here, we don't want to wait for the next periodic sync. But we also don't want to fetch nightbot
-                // immediately, since we don't know how long the nightbot api takes to update / is cached. So instead
-                // we force the next sync in a few seconds from now.
-                scheduleNextCommandsUpdate(Duration.ofSeconds(5).toMillis());
-            } finally {
-                commandUpdateLock.unlock();
-            }
-        }
-
-        @Override
-        public void onConnectAttemptFailed(ConnectAttemptFailedEvent event) throws Exception {
-            if (event.getRemainingAttempts() <= 0) {
-                int attempts = event.getBot().getConfiguration().getAutoReconnectAttempts();
-                throw new RuntimeException("Bot could not reconnect after " + attempts + " attempts. " +
-                        "Forcing crash to restart service...");
-            }
-        }
-
-        @Override
-        public void onUnknown(UnknownEvent event) throws Exception {
-            // Pong Server responses to periodic PING requests are not handled anywhere else
-            // Server sends PONG responses to our PING responses (every time socket timeout was hit while waiting for
-            // another message); and PING requests from the twitch
-            if (event.getCommand().equals("PONG") || event.getCommand().equals("PING"))
-                successfulPings.increment();
         }
     }
 }
