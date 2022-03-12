@@ -10,7 +10,7 @@ import java.util.Set;
 
 public class Config {
 
-    private Properties props;
+    protected Properties props;
 
 
     public String getDiscordToken() {

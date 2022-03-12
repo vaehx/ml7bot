@@ -61,11 +61,14 @@ public class CommandChangelogService {
     private final Config config;
     private final GatewayDiscordClient discord;
 
+    @VisibleForTesting
+    protected NightbotAPI nightbot;
+
     private TwitchChat twitchChat;
     private GuildMessageChannel changelogChannel;
     private String nightbotChannelId;
     private Map<String, String> lastTwitchCommandEditors; // command name -> username
-    private Map<String, NightbotCommand> commands;
+    protected Map<String, NightbotCommand> commands;
     private Set<String> ignoredCommands;
     private CommandsUpdater commandsUpdater;
     private Lock commandUpdateLock;
@@ -82,6 +85,8 @@ public class CommandChangelogService {
         this.config = config;
         this.discord = discord;
 
+        nightbot = new NightbotAPI();
+
         lastTwitchCommandEditors = new HashMap<>();
         ignoredCommands = config.getCommandChangelogIgnoredCommands();
 
@@ -94,7 +99,7 @@ public class CommandChangelogService {
     public void start() {
         // Figure out nightbot channel id from twitch channel name
         try {
-            NightbotChannel channel = NightbotAPI.fetchChannelByName(config.getCommandChangelogTwitchChannel());
+            NightbotChannel channel = nightbot.fetchChannelByName(config.getCommandChangelogTwitchChannel());
             nightbotChannelId = channel.id;
         } catch (Exception e) {
             throw new RuntimeException("Could not fetch nightbot channel id from channel name " +
@@ -111,7 +116,7 @@ public class CommandChangelogService {
 
         LOG.info("Fetching nightbot commands to diff against...");
         try {
-            commands = NightbotAPI.fetchChannelCommands(nightbotChannelId);
+            commands = nightbot.fetchChannelCommands(nightbotChannelId);
         } catch (Exception e) {
             throw new RuntimeException("Initial nightbot commands fetch failed!", e);
         }
@@ -228,7 +233,8 @@ public class CommandChangelogService {
     }
 
 
-    private class CommandsUpdater implements Runnable {
+    @VisibleForTesting
+    class CommandsUpdater implements Runnable {
 
         @Override
         public void run() {
@@ -241,10 +247,11 @@ public class CommandChangelogService {
             }
         }
 
-        private void runIntrnl() {
+        @VisibleForTesting
+        protected void runIntrnl() {
             Map<String, NightbotCommand> fetchedCommands;
             try {
-                fetchedCommands = NightbotAPI.fetchChannelCommands(nightbotChannelId);
+                fetchedCommands = nightbot.fetchChannelCommands(nightbotChannelId);
             } catch (Exception e) {
                 failedCommandFetches.increment();
                 LOG.error("Failed fetch current nightbot channel commands from API. Will ignore changes...", e);
@@ -307,7 +314,7 @@ public class CommandChangelogService {
             lastTwitchCommandEditors.clear();
         }
 
-        private void onNewCommand(NightbotCommand cmd) {
+        protected void onNewCommand(NightbotCommand cmd) {
             if (ignoredCommands.contains(cmd.name))
                 return;
 
@@ -317,7 +324,7 @@ public class CommandChangelogService {
                     ":\n" + getCommandInfo(cmd)).block();
         }
 
-        private void onDeletedCommand(NightbotCommand cmd) {
+        protected void onDeletedCommand(NightbotCommand cmd) {
             if (ignoredCommands.contains(cmd.name))
                 return;
 
@@ -327,7 +334,7 @@ public class CommandChangelogService {
                     ":\n" + getCommandInfo(cmd)).block();
         }
 
-        private void onEditedCommand(NightbotCommand oldCmd, NightbotCommand newCmd) {
+        protected void onEditedCommand(NightbotCommand oldCmd, NightbotCommand newCmd) {
             if (ignoredCommands.contains(newCmd.name))
                 return;
 
@@ -338,7 +345,7 @@ public class CommandChangelogService {
                     " Was:\n" + getCommandInfo(oldCmd)).block();
         }
 
-        private String getCommandInfo(NightbotCommand cmd) {
+        protected String getCommandInfo(NightbotCommand cmd) {
             return "> User-Level: " + cmd.userLevel + " | " +
                     "Alias: " + (!cmd.alias.isEmpty() ? "`" + cmd.alias + "`" : "-") + " | " +
                     "Cooldown: " + cmd.coolDown + "s\n" +
@@ -348,7 +355,7 @@ public class CommandChangelogService {
         /**
          * Returns the editor's nickname in twitch chat, or null if the command was probably edited in dashboard
          */
-        private String getLikelyEditor(NightbotCommand cmd) {
+        protected String getLikelyEditor(NightbotCommand cmd) {
             return lastTwitchCommandEditors.get(cmd.name);
         }
 

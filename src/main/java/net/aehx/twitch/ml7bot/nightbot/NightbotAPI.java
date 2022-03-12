@@ -2,6 +2,8 @@ package net.aehx.twitch.ml7bot.nightbot;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -16,22 +18,11 @@ public class NightbotAPI {
 
     private static final String NIGHTBOT_API_URL = "https://api.nightbot.tv/1";
 
-
     /**
      * @return Map of name -> {@link NightbotCommand}
      */
-    public static Map<String, NightbotCommand> fetchChannelCommands(String channelId) throws Exception {
-        JSONObject response;
-        try {
-            URL url = new URL(NIGHTBOT_API_URL + "/commands");
-            String str = getJSONHttp(url, new HashMap<String, String>() {{
-                put("nightbot-channel", channelId);
-            }});
-
-            response = new JSONObject(str);
-        } catch (Exception e) {
-            throw new Exception("Failed fetch nightbot api for channel commands", e);
-        }
+    public Map<String, NightbotCommand> fetchChannelCommands(String channelId) throws Exception {
+        JSONObject response = fetchChannelCommandsJson(channelId);
 
         Map<String, NightbotCommand> commands = new HashMap<>();
         JSONArray commandsArr = response.getJSONArray("commands");
@@ -53,15 +44,22 @@ public class NightbotAPI {
         return commands;
     }
 
-    public static NightbotChannel fetchChannelByName(String name) throws Exception {
-        JSONObject response;
+    protected JSONObject fetchChannelCommandsJson(String channelId) throws Exception {
         try {
-            URL url = new URL(NIGHTBOT_API_URL + "/channels/t/" + name);
-            String str = getJSONHttp(url);
-            response = new JSONObject(str);
+            URL url = new URL(NIGHTBOT_API_URL + "/commands");
+            String str = getJSONHttp(url, new HashMap<String, String>() {{
+                put("nightbot-channel", channelId);
+            }});
+
+            return new JSONObject(str);
         } catch (Exception e) {
-            throw new Exception("Failed fetch channel by name from Nighbot api", e);
+            throw new Exception("Failed fetch nightbot api for channel commands", e);
         }
+    }
+
+
+    public NightbotChannel fetchChannelByName(String name) throws Exception {
+        JSONObject response = fetchChannelByNameJson(name);
 
         JSONObject channelObj = response.getJSONObject("channel");
 
@@ -70,6 +68,17 @@ public class NightbotAPI {
 
         return channel;
     }
+
+    protected JSONObject fetchChannelByNameJson(String name) throws Exception {
+        try {
+            URL url = new URL(NIGHTBOT_API_URL + "/channels/t/" + name);
+            String str = getJSONHttp(url);
+            return new JSONObject(str);
+        } catch (Exception e) {
+            throw new Exception("Failed fetch channel by name from Nighbot api", e);
+        }
+    }
+
 
     private static String getJSONHttp(URL url, Map<String, String> additionalHeaders) throws Exception {
         HttpURLConnection con = (HttpURLConnection) url.openConnection();
