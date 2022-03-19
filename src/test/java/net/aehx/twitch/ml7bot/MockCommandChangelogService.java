@@ -7,17 +7,20 @@ import net.aehx.twitch.ml7bot.nightbot.NightbotCommand;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 
 public class MockCommandChangelogService extends CommandChangelogService {
 
     private final CommandsUpdater commandsUpdater;
+    private final AnnouncementFormatter announcementFormatter;
 
     public MockCommandChangelogService(Config config) throws Exception {
         super(config, null, new MetricsService("test", false, null, 0));
 
         nightbot = new MockNightbotAPI();
         commandsUpdater = new CommandsUpdater();
+        announcementFormatter = new AnnouncementFormatter();
 
         // Do initial fetch to diff against
         commands = nightbot.fetchChannelCommands("ignored");
@@ -59,8 +62,20 @@ public class MockCommandChangelogService extends CommandChangelogService {
         return commandsUpdater;
     }
 
+    public AnnouncementFormatter getAnnouncementFormatter() {
+        return announcementFormatter;
+    }
+
     public MockNightbotAPI getNightbotAPI() {
         return (MockNightbotAPI) nightbot;
+    }
+
+    public void setLastTwitchCommandEditor(String command, String editor) {
+        lastTwitchCommandEditors.put(command, editor);
+    }
+
+    public void clearLastTwitchCommandEditors() {
+        lastTwitchCommandEditors.clear();
     }
 
 

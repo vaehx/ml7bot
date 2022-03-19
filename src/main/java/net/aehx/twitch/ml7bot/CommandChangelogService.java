@@ -67,10 +67,16 @@ public class CommandChangelogService {
     private TwitchChat twitchChat;
     private GuildMessageChannel changelogChannel;
     private String nightbotChannelId;
-    private Map<String, String> lastTwitchCommandEditors; // command name -> username
+
+    @VisibleForTesting
+    protected Map<String, String> lastTwitchCommandEditors; // command name -> username
+
+    @VisibleForTesting
     protected Map<String, NightbotCommand> commands;
+
     private Set<String> ignoredCommands;
     private CommandsUpdater commandsUpdater;
+    private AnnouncementFormatter announcementFormatter;
     private Lock commandUpdateLock;
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> scheduledSync;
@@ -113,6 +119,7 @@ public class CommandChangelogService {
         scheduler = Executors.newScheduledThreadPool(1);
         commandsUpdater = new CommandsUpdater();
         commandUpdateLock = new ReentrantLock();
+        announcementFormatter = new AnnouncementFormatter();
 
         LOG.info("Fetching nightbot commands to diff against...");
         try {
@@ -233,6 +240,18 @@ public class CommandChangelogService {
     }
 
 
+    /**
+     * Escapes discord markdown symbols
+     */
+    @VisibleForTesting
+    static String escapeDiscordMarkdown(String str) {
+        if (str == null)
+            throw new IllegalArgumentException("str is null");
+
+        return str.replaceAll("(?<!\\\\)([*_~`>])", "\\\\$1");
+    }
+
+
     @VisibleForTesting
     class CommandsUpdater implements Runnable {
 
@@ -318,46 +337,28 @@ public class CommandChangelogService {
             if (ignoredCommands.contains(cmd.name))
                 return;
 
-            String editor = getLikelyEditor(cmd);
-            changelogChannel.createMessage("\u2728 **New** command `" + cmd.name + "` added" +
-                    (editor != null ? " by **" + editor + "** in Twitch Chat" : " in Dashboard") +
-                    ":\n" + getCommandInfo(cmd)).block();
+            String msg = announcementFormatter.formatNewCommandAnnouncement(cmd);
+            changelogChannel.createMessage(msg).block();
         }
 
         protected void onDeletedCommand(NightbotCommand cmd) {
             if (ignoredCommands.contains(cmd.name))
                 return;
 
-            String editor = getLikelyEditor(cmd);
-            changelogChannel.createMessage("\u274C **Deleted** command `" + cmd.name + "`" +
-                    (editor != null ? " by **" + editor + "** in Twitch Chat" : " in Dashboard") +
-                    ":\n" + getCommandInfo(cmd)).block();
+            String msg = announcementFormatter.formatDeletedCommandAnnouncement(cmd);
+            changelogChannel.createMessage(msg).block();
         }
 
         protected void onEditedCommand(NightbotCommand oldCmd, NightbotCommand newCmd) {
             if (ignoredCommands.contains(newCmd.name))
                 return;
 
-            String editor = getLikelyEditor(newCmd);
-            changelogChannel.createMessage("\u270F **Edited** command `" + newCmd.name + "`" +
-                    (editor != null ? " by **" + editor + "** in Twitch Chat" : " in Dashboard") +
-                    " to:\n" + getCommandInfo(newCmd) + "\n" +
-                    " Was:\n" + getCommandInfo(oldCmd)).block();
+            String msg = announcementFormatter.formatEditedCommandAnnouncement(oldCmd, newCmd);
+            changelogChannel.createMessage(msg).block();
         }
 
-        protected String getCommandInfo(NightbotCommand cmd) {
-            return "> User-Level: " + cmd.userLevel + " | " +
-                    "Alias: " + (!cmd.alias.isEmpty() ? "`" + cmd.alias + "`" : "-") + " | " +
-                    "Cooldown: " + cmd.coolDown + "s\n" +
-                    "> ```\n> " + cmd.message + "\n> ```";
-        }
 
-        /**
-         * Returns the editor's nickname in twitch chat, or null if the command was probably edited in dashboard
-         */
-        protected String getLikelyEditor(NightbotCommand cmd) {
-            return lastTwitchCommandEditors.get(cmd.name);
-        }
+
 
 
         private class NightbotCommandChange {
@@ -380,6 +381,52 @@ public class CommandChangelogService {
             boolean isEdited() {
                 return oldCommand != null && newCommand != null;
             }
+        }
+    }
+
+
+    @VisibleForTesting
+    class AnnouncementFormatter {
+        String formatNewCommandAnnouncement(NightbotCommand cmd) {
+            String source = formatChangeSource(cmd);
+            return "\u2728 **New** command `" + cmd.name + "` added " + source + ":\n" +
+                    formatCommandInfo(cmd);
+        }
+
+        String formatDeletedCommandAnnouncement(NightbotCommand cmd) {
+            String source = formatChangeSource(cmd);
+            return "\u274C **Deleted** command `" + cmd.name + "` " + source + ":\n" +
+                    formatCommandInfo(cmd);
+        }
+
+        String formatEditedCommandAnnouncement(NightbotCommand oldCmd, NightbotCommand newCmd) {
+            String source = formatChangeSource(newCmd);
+            return "\u270F **Edited** command `" + newCmd.name + "` " + source +
+                    " to:\n" + formatCommandInfo(newCmd) + "\n" +
+                    " was before:\n" + formatCommandInfo(oldCmd);
+        }
+
+        String formatCommandInfo(NightbotCommand cmd) {
+            return "> User-Level: " + cmd.userLevel + " | " +
+                    "Alias: " + (!cmd.alias.isEmpty() ? "`" + cmd.alias + "`" : "-") + " | " +
+                    "Cooldown: " + cmd.coolDown + "s\n" +
+                    "> ```\n> " + cmd.message + "\n> ```";
+        }
+
+        String formatChangeSource(NightbotCommand cmd) {
+            String editor = getLikelyEditor(cmd);
+            if (editor != null) {
+                return "by **" + escapeDiscordMarkdown(editor) + "** in Twitch Chat";
+            } else {
+                return "in Dashboard";
+            }
+        }
+
+        /**
+         * Returns the editor's nickname in twitch chat, or null if the command was probably edited in dashboard
+         */
+        String getLikelyEditor(NightbotCommand cmd) {
+            return lastTwitchCommandEditors.get(cmd.name);
         }
     }
 }
