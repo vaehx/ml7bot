@@ -1,5 +1,5 @@
 plugins {
-    id 'com.github.johnrengelman.shadow' version '6.1.0'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
     id 'java'
 }
 
@@ -24,8 +24,8 @@ dependencies {
     implementation 'com.google.guava:guava:31.1-jre'
 
     // Metrics
-    implementation group: 'io.micrometer', name: 'micrometer-core', version: '1.6.1'
-    implementation group: 'io.micrometer', name: 'micrometer-registry-prometheus', version: '1.6.1'
+    implementation group: 'io.micrometer', name: 'micrometer-core', version: '1.8.0'
+    implementation group: 'io.micrometer', name: 'micrometer-registry-prometheus', version: '1.8.0'
 
     testImplementation(platform('org.junit:junit-bom:5.8.2'))
     testImplementation('org.junit.jupiter:junit-jupiter')
